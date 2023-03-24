@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<flow name="splitting_payload_sending_to_queues_in_sequence" doc:id="174d45a6-4be7-4ee6-ad76-ca0307f65a83" >
+		<http:listener doc:name="Listener" doc:id="e9a6b8a3-a0d3-4e7b-b39c-00b6939c987d" config-ref="HTTP_Listener_config" path="/usecase"/>
+		<ee:transform doc:name="Transform Message" doc:id="4e64147f-65d7-4650-8f5d-25e3914345fb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "employees":[{
+        "firstName":"yathendra",
+        "lastName":"Alluru",
+        "ph":999999
+    },
+    {
+        "firstName":"ranjith",
+        "lastName":"Akula",
+        "ph":999999
+    },
+    {
+        "firstName":"pravana",
+        "lastName":"Alluru",
+        "ph":999999
+    },{
+        "firstName":"hari",
+        "lastName":"pakanati",
+        "ph":999999
+    },{
+        "firstName":"raghava",
+        "lastName":"Alluru",
+        "ph":999999
+    },{
+        "firstName":"Vinodh",
+        "lastName":"Gova",
+        "ph":999999
+    }]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="64e3662e-387a-4aa4-aab6-25abe201f9e4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Arrays
+output application/json
+var a = payload.employees divideBy  3
+---
+a map(data,index)->{
+	"data":write(data,'application/json'),
+    "position":index,
+    "size":sizeOf(a),
+    "messageId": uuid(),
+    "coRelationID": correlationId
+    
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="2caa6949-8c4f-4b90-9150-ee6e707e094e" collection="payload">
+			<db:insert doc:name="Insert" doc:id="9b6f17ec-a650-4da9-8df8-beeb700386f2" config-ref="Database_Config">
+			<db:sql><![CDATA[insert into json values(:data, :position, :size, :messageId, :coRelationID)]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	"data":payload.data,
+	"position":payload.position,
+	"size":payload.size,
+	"messageId":payload.messageId,
+	"coRelationID":payload.coRelationID
+	
+}]]]></db:input-parameters>
+		</db:insert>
+		</foreach>
+		<ee:transform doc:name="Transform Message" doc:id="d65af68d-43ac-4b5c-a1ba-34576c36a26f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

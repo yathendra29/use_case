@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="5677516c-a54d-48ba-bf97-c23a78fbce25" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<vm:config name="VM_Config" doc:name="VM Config" doc:id="a544e4bd-0af3-4a94-9b34-e4a105f8c6a8" >
+		<vm:queues >
+			<vm:queue queueName="queue1" queueType="PERSISTENT" />
+			<vm:queue queueName="demo" queueType="PERSISTENT"/>
+		</vm:queues>
+	</vm:config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="6b3c3193-19cf-4244-8dda-f3e603ddc321" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="Raghava$777" database="myfirstdb" />
+	</db:config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="2c6efbd7-f565-4b40-823e-77b624e09d29" >
+		<http:request-connection host="localhost" port="8081" />
+	</http:request-config>
+	<flow name="Orders_recieving" doc:id="42864dba-76a9-42b1-9a43-b4c982805496" >
+		<http:listener doc:name="Listener" doc:id="3ae16fe4-701b-4e6f-824c-c97f6edc10af" config-ref="HTTP_Listener_config" path="/orders"/>
+		<ee:transform doc:name="input payload" doc:id="e6052a3d-a838-4cc4-bffd-38063391daf6" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="input_payload" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"id":9,
+	"name":"yathendra",
+	"qnty":9,
+	"crltn_id":"0409"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<vm:publish queueName="demo" doc:name="Publish" doc:id="6a2572e7-e49f-4be3-ac85-70e600d905b7" config-ref="VM_Config" timeout="30"/>
+		<logger level="INFO" doc:name="Logger" doc:id="888ad6dd-a8ec-423a-9d97-d8cd37a93be0" message="inserted into Vm"/>
+		<set-payload value='#["Your order was placed succesfully"]' doc:name="Set Payload" doc:id="3353d35f-6b7b-44c0-ac33-d542d226ade6" />
+	</flow>
+	<flow name="orders_processing" doc:id="a3dc53da-7dc2-406a-92fb-e53c9353fb03" >
+		<http:listener doc:name="keep scheduler here and keep 5sec" doc:id="d0460655-2ecc-478c-a482-b53b3d7eb714" config-ref="HTTP_Listener_config" path="/5"/>
+		<vm:consume doc:name="Consume" doc:id="6eea9704-f307-4fab-b0f4-6c3915135a12" config-ref="VM_Config" queueName="demo"/>
+		<logger level="INFO" doc:name="Logger" doc:id="d764ac3a-c3c3-4fb7-827a-3d9d8eb2bff2" message="#[payload]"/>
+		<db:insert doc:name="Insert" doc:id="ad474ca6-19f4-403f-8b5d-3095fc5b19d1" config-ref="Database_Config">
+			<db:sql ><![CDATA[insert into myfirstdb.orderinfo values(:id,:name,:qnty,:crltn_id)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+		</db:insert>
+		<logger level="INFO" doc:name="Logger" doc:id="5aca9a99-1a86-4956-b769-b6779a58146c" message="received in db"/>
+	</flow>
+	<flow name="creating_volume_api" doc:id="756cc535-f510-4738-ad69-a344242e6066" >
+		<http:listener doc:name="keep scheduler here and keep 1sec" doc:id="9b9319a4-9cc2-43f1-831c-233bcbf34252" config-ref="HTTP_Listener_config" path="/1"/>
+		<ee:transform doc:name="Transform Message" doc:id="594b57f2-6e7d-4669-8ffc-55f93c1deec7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"id":randomInt(100),
+	"name":"yathendra",
+	"qnty":randomInt(10),
+	"crltn_id":randomInt(10000)
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="dc3c5f2c-ebd3-43dd-a945-e5ebd78efa79" config-ref="HTTP_Request_configuration" path="/orders"/>
+	</flow>
+</mule>

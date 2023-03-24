@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<types:mule xmlns:types="http://www.mulesoft.org/schema/mule/types">
+  <types:catalog>
+    <types:type name="csvResponse" format="csv">
+      <types:shape format="weave" example="examples/std1.csv"><![CDATA[%dw 2.0
+
+type csvResponse = Array<{|  id: String,   Name: String,   Age: String,   Gender: String,   DOJ: String,   City: String|}> {"isQuotedString": "false",
+"header": "true",
+"headerLineNumber": "0",
+"separator": ","}
+
+]]></types:shape>
+      <types:properties>
+        <types:property name="headerLineNumber" value="0"/>
+        <types:property name="header" value="true"/>
+        <types:property name="isQuotedString" value="false"/>
+        <types:property name="separator" value=","/>
+      </types:properties>
+    </types:type>
+    <types:type name="json" format="json">
+      <types:shape format="weave" example="examples/new.json"><![CDATA[%dw 2.0
+
+type json = Array<{|  std_id: Number {"typeId": "int"},   name: String,   age: Number {"typeId": "int"},   gender: String,   doj: String,   city: String|}> {"example": "[{\\\"std_id\\\":100,\\\"name\\\":\\\"ranjith\\\",\\\"age\\\":20,\\\"gender\\\":\\\"M\\\",\\\"doj\\\":\\\"1994-08-19\\\",\\\"city\\\":\\\"vki\\\"}]"}
+
+]]></types:shape>
+    </types:type>
+  </types:catalog>
+  <types:enrichment select="#e6052a3d-a838-4cc4-bffd-38063391daf6"/>
+  <types:enrichment select="#38083f4e-fabd-47d8-a864-c59165eaccdf">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="csvResponse"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#a71b2616-3599-42e0-9b14-e4c52fd8168d">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="json"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+</types:mule>

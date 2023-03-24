@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<flow name="BatchFlow" doc:id="b9f2c460-a427-44b4-935b-7b72357f0eb1" >
+		<file:listener doc:name="On New or Updated File" doc:id="38083f4e-fabd-47d8-a864-c59165eaccdf" directory="C:\\Users\\Admin\\Documents\\mule\\batch" autoDelete="true" outputMimeType="application/csv">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</file:listener>
+		<ee:transform doc:name="Transform Message" doc:id="a71b2616-3599-42e0-9b14-e4c52fd8168d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	std_id: payload01.id as Number,
+	name: payload01.Name,
+	age: payload01.Age as Number,
+	gender: payload01.Gender,
+	doj: payload01.DOJ,
+	city: payload01.City
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c5701310-3a75-46fc-bf1e-161ed932646f" message="#[payload]"/>
+		<batch:job jobName="BatchBatch_Job" doc:id="f784693a-95fa-4c97-b7d4-1a74a04ec15a" blockSize="6" maxFailedRecords="2">
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="0191d3a4-0055-47a9-ae61-bcb3ae3f20cf" >
+					<logger level="INFO" doc:name="Logger" doc:id="78eed22d-f66f-4a49-8142-57ac8366be3f" message="step1 :::  #[payload]"/>
+					<set-variable value="#[payload]" doc:name="Set Variable" doc:id="d435c55b-8b0f-4a16-85e9-d59cf142ec2e" variableName="json"/>
+					<db:insert doc:name="Insert" doc:id="b6f03aed-e66a-41b7-a9bb-0f06c344e5b1" config-ref="Database_Config">
+						<db:sql ><![CDATA[insert into studentdetails values(:std_id, :name, :age, :gender, :dob, :city)]]></db:sql>
+						<db:input-parameters ><![CDATA[#[{
+	"std_id":payload.std_id,
+	"name":payload.name,
+	"age":payload.age,
+	"gender":payload.gender,
+	"dob":payload.doj,
+	"city":payload.city
+}]]]></db:input-parameters>
+					</db:insert>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="f3efffec-0970-4e6e-abb9-58eb679bb35d" size="2">
+						<logger level="INFO" doc:name="Logger" doc:id="26668893-92a1-4e6b-9b39-0ef36123a349" message="aggregator :: :: #[payload]"/>
+						<ee:transform doc:name="Transform Message" doc:id="6bb783ec-76cb-42da-9699-02f94d408969" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+flatten((payload map{
+    "hi":read($,'application/json')
+
+}) map({
+    ("ID":$ orderBy $.city pluck $)
+}) reduce ($ ++ $$) pluck $ )]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="Logger" doc:id="a41d2c36-b498-4eba-a400-209fcd5c121e" message="after TF ::::  #[payload]"/>
+						<file:write doc:name="Write" doc:id="fd93aa8a-ecb4-4bb1-9749-24b74c12ba8a" path='#["C:\\Users\\Admin\\Documents\\mule\\aggregator\\" ++ (random() * 1000)  ++ ".txt"]'/>
+					</batch:aggregator>
+					<ee:transform doc:name="Transform Message" doc:id="32d7e44b-99fd-41d6-a8dc-ecf769322beb" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.json]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="e34ff3b9-3d87-4a60-9c4d-debc0fd623b7" message="On complete  ::: #[payload]"/>
+				<db:insert doc:name="Insert" doc:id="40d44bf7-faf2-43be-aac1-a949fda9768e" config-ref="Database_Config">
+					<db:sql ><![CDATA[insert into studentbatch values (:batchId, :totalRecords, :faledRecords, :successRecords)]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	"batchId":payload.batchJobInstanceId,
+	"totalRecords":payload.totalRecords,
+	"faledRecords":payload.failedRecords,
+	"successRecords":payload.successfulRecords
+	
+}]]]></db:input-parameters>
+				</db:insert>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+</mule>

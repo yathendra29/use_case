@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<vm:config name="VM_Config1" doc:name="VM Config" doc:id="162a4cbd-974f-48e2-b9d2-f80eff67d049" >
+		<vm:queues >
+			<vm:queue queueName="product_Completed" queueType="PERSISTENT" />
+			<vm:queue queueName="Price_Completed" queueType="PERSISTENT" />
+		</vm:queues>
+	</vm:config>
+	<flow name="getting_records_when_Product_Updated" doc:id="2f2a1c57-ef9a-4a32-a156-6f8347d4710d" >
+		<file:listener doc:name="product updated" doc:id="2fdee0f0-cf75-4201-be40-fc6516ab0937" directory="C:\\Users\\Admin\\Documents\\mule\\product" autoDelete="true">
+			<scheduling-strategy >
+				<fixed-frequency frequency="5000" />
+			</scheduling-strategy>
+		</file:listener>
+		<logger level="INFO" doc:name="process updated product" doc:id="35179d26-e96e-411c-912e-1af2847116e1" message="01  ::: Product Sync Completed"/>
+		<vm:publish doc:name="notify product updation to price" doc:id="804aed36-d9c9-4abb-b3b4-3ff5313d60a3" config-ref="VM_Config1" queueName="product_Completed"/>
+	</flow>
+	<flow name="Price_SYNC_(notification_Recieves_From_Product_and_sending_Notification_to_Inventory)" doc:id="93b916e5-1587-410d-8d11-1e2f097cf065" >
+		<vm:listener queueName="product_Completed" doc:name="Start Price(just for alert nothing to do with payload)" doc:id="cdb7394a-c445-42a4-83e6-3524450e83b6" config-ref="VM_Config1"/>
+		<file:read doc:name="Read The Price Details" doc:id="b54e67c4-d125-47cd-ae65-80598e2995ba" path="C:\\Users\\Admin\\Documents\\mule\\price\\new.json"/>
+		<logger level="INFO" doc:name="Process the price detals" doc:id="1f129077-7c00-43af-8d35-f3680379d881" message="02 :: Price Details Completed"/>
+		<vm:publish doc:name="notify price details to Inventory" doc:id="00d8d233-fe73-4436-b0ca-9bda3532a184" config-ref="VM_Config1" queueName="Price_Completed"/>
+	</flow>
+	<flow name="Inventory_SYNC_Notification_Recieves_from_PriceSYNC" doc:id="152c4a17-833f-4e1a-ae0d-b889965e9c02" >
+		<vm:listener doc:name="Start Inventory (just for alert nothing to do with payload)" doc:id="e4b40be6-81c5-4c00-8f74-131413999402" config-ref="VM_Config1" queueName="Price_Completed"/>
+		<file:read doc:name="Read The Inventory Details" doc:id="9e7ecd50-5ddc-480b-a6ec-4bbee9063dd7" path="C:\\Users\\Admin\\Documents\\mule\\Inventory\\new.json"/>
+		<logger level="INFO" doc:name="Process the Inventory Details" doc:id="c9c8f8e9-3845-4b46-a20d-47c562635029" message="03  ::: Inventory Details completed"/>
+	</flow>
+	<flow name="MANUAL_EVENT_(if_any_schedulor_failed_to_SYNC_the_event)" doc:id="9034ce24-965c-443d-90c2-43d03740a98d" >
+		<http:listener doc:name="Listener" doc:id="df174336-f4c9-42f1-a774-2e03a28cc40b" config-ref="HTTP_Listener_config" path="/manualEventTrigger"/>
+		<logger level="INFO" doc:name="Logger" doc:id="a30b27d4-cbff-4acd-ada1-26098ced131b" message="MANUAL MESSAGE "/>
+		<vm:publish queueName="#[attributes.queryParams.event]" doc:name="Publish" doc:id="31da6cf0-ffca-40b3-b075-ad2295e67e19" config-ref="VM_Config1"/>
+	</flow>
+</mule>
